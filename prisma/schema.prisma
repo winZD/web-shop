@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TenantTable {
+  id        String   @id @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("Tenants")
+}
+
+model UserTable {
+  id        String   @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId  String
+  email     String
+  password  String
+  firstName String
+  lastName  String
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([id, tenantId])
+  @@unique([tenantId, email]) // Ensure unique emails per tenant
+  @@map("Users")
+}
+
+model ProductTable {
+  id          String   @default(dbgenerated("gen_random_ulid()")) @db.Char(26)
+  tenantId    String
+  brandId     String? // Relation to the Brand table
+  name        String
+  description String
+  price       Float
+  stock       Int      @default(0)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  Brand BrandTable? @relation(name: "FK_Product_Brand", fields: [brandId, tenantId], references: [id, tenantId])
+
+  // Composite primary key
+  @@id([id, tenantId])
+  @@map("Products")
+}
+
+model BrandTable {
+  id           String         @default(dbgenerated("gen_random_ulid()")) @db.Char(26)
+  tenantId     String
+  name         String
+  description  String?
+  logoUrl      String? // URL to the brand's logo
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  ProductTable ProductTable[] @relation(name: "FK_Product_Brand")
+
+  // Composite primary key
+  @@id([id, tenantId])
+  @@unique([tenantId, name]) // Ensure unique brand names per tenant
+}
+
+model CategoryTable {
+  id          String   @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId    String
+  name        String
+  description String?
+  parentId    String? // Recursive parent relationship
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@id([id, tenantId])
+  @@unique([tenantId, parentId]) // Ensure unique parent-child relationship per tenant
+  @@map("Categories")
+}
+
+model OrderTable {
+  id          String   @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId    String
+  userId      String
+  status      String   @default("pending")
+  totalAmount Float    @default(0.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@id([id, tenantId])
+  @@map("Orders")
+}
+
+model OrderItemTable {
+  id        String @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId  String
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+
+  @@id([id, tenantId])
+  @@map("OrderItems")
+}
+
+model AddressTable {
+  id          String @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId    String
+  userId      String
+  addressLine String
+  city        String
+  state       String
+  postalCode  String
+  country     String
+
+  @@id([id, tenantId])
+  @@map("Addresses")
+}
+
+model RefreshTokenTable {
+  id        String   @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId  String
+  userId    String
+  token     String   @unique
+  familyId  String // Token family for grouped invalidation
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([id, tenantId])
+  @@index([tenantId, familyId]) // Efficient queries for token families
+  @@map("RefreshTokens")
+}
+
+model PaymentMethodTable {
+  id           String   @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId     String
+  userId       String
+  cardLast4    String
+  cardType     String
+  cardExpiry   String
+  billingName  String
+  billingEmail String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@id([id, tenantId])
+  @@unique([tenantId, userId, cardLast4])
+  @@map("PaymentMethods")
+}
+
+model PaymentTransactionTable {
+  id              String   @db.Char(26) // @default(dbgenerated("gen_random_ulid()"))
+  tenantId        String
+  userId          String
+  paymentMethodId String
+  orderId         String?
+  amount          Float
+  currency        String
+  status          String
+  gatewayRef      String?
+  gateway         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@id([id, tenantId])
+  @@map("PaymentTransactions")
+}
